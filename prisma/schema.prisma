@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  userName      String         @unique
+  email         String         @unique
+  password      String?
+  imageUrl      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  posts         Post[]
+  following     Follow[]       @relation("Following")
+  followers     Follow[]       @relation("Followers")
+  oauthAccounts OAuthAccount[]
+}
+
+enum OAuthProvider {
+  GOOGLE
+  GITHUB
+}
+
+model OAuthAccount {
+  id                String        @id @default(cuid())
+  provider          OAuthProvider //eg. Google
+  providerAccountId String //eg. "123125457643" an id google sends to map this user identifer to that id. not dependant on email or something
+  accessToken       String?
+  refreshToken      String?
+  userId            String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId]) //useful for => profile page => getting connected providers => index on id to optimize the search and get the providers account
+}
+
+model Post {
+  id        String   @id @default(cuid()) //auto create index on primaryKey because of @id
+  title     String
+  content   Json
+  tags      String[]
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([authorId, createdAt])
+}
+
+model Follow {
+  id         String @id @default(cuid())
+  followerId String
+  followeeId String
+
+  follower User @relation("Following", fields: [followerId], references: [id])
+  followee User @relation("Followers", fields: [followeeId], references: [id])
+
+  @@unique([followerId, followeeId])
+  @@index([followerId])
+  @@index([followeeId])
+}
