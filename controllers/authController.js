@@ -21,7 +21,19 @@ const createSendTokens = (user, statusCode, res) => {
         accessToken,
         user : userWithoutPassword
     })
+
 };
+
+const setTokenAndRedirct = (user,statusCode,res) => {
+  const refreshToken = signRefreshToken(user.id);
+  res.cookie('refreshToken', refreshToken, {
+        httpOnly : true,
+        secure : process.env.COOKIE_SECURE ==='true',
+        sameSite: 'lax',
+        maxAge : 7*24*60*60*1000 //7d
+    })
+  res.status(statusCode).redirect(`http://localhost:3001/feed`);
+}
 
 exports.register = catchAsync(async (req, res, next) => {
   //validating inputs done by authMiddlewares
@@ -82,8 +94,26 @@ exports.refreshToken = catchAsync(async (req,res,next) => {
   createSendTokens(user,200,res);
 })
 
-exports.googleCallBack = catchAsync(async (req,res,next) => {
+exports.oAuthCallBack = catchAsync(async (req,res,next) => {
+  // passport already assigned the Prisma user to req.user. Because we authenticate with
+  // session:false, passport sets req.user WITHOUT calling req.logIn / touching req.session,
+  // so this session can never become an auth session - it only ever held the state nonce.
   const user = req.user;
-  createSendTokens(user,200,res);
-
+  setTokenAndRedirct(user,200,res);
+  
 })
+
+// Landing target for passport's `failureRedirect`. Reached by a top-level browser
+// navigation (a user clicking Cancel on the GitHub consent screen, or our strategy
+// calling done(null,false) because the GitHub account exposes no email), so the
+// same handler serves both the google and github routes.
+exports.oAuthFailed = (req, res) => {
+  // passport appends ?error=<message> here only because we set failureMessage:true
+  const reason = req.query.error;
+  const provider = req.path.startsWith('/google') ? 'Google' : 'GitHub';
+  res.status(401).json({
+      status: 'error',
+      message: `${provider} sign in failed. Make sure your ${provider} account has a primary email address set, then try again.`,
+      ...(reason ? { reason } : {}),
+  });
+};

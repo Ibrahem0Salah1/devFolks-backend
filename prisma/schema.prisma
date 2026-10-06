@@ -30,7 +30,7 @@ enum OAuthProvider {
 
 model OAuthAccount {
   id                String        @id @default(cuid())
-  provider          OAuthProvider //eg. Google
+  provider          OAuthProvider //eg. Google | Github
   providerAccountId String //eg. "123125457643" an id google sends to map this user identifer to that id. not dependant on email or something
   accessToken       String?
   refreshToken      String?
